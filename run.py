@@ -106,7 +106,21 @@ class RunArguments:
     )
 
 
-def parse_arguments():
+def parse_arguments() -> tuple:
+    """
+    Parse command-line arguments or a JSON configuration file for running and training.
+
+    This function uses `HfArgumentParser` to parse arguments for `RunArguments` and `TrainingArguments`.
+    If a JSON file path is provided as the first command-line argument (with a `.json` extension and length 2),
+    it loads arguments from the JSON file. Otherwise, it parses arguments from the command line.
+
+    Returns
+    -------
+    tuple
+        A tuple containing two elements:
+        - run_args: An instance of `RunArguments` with run-specific arguments.
+        - training_args: An instance of `TrainingArguments` with training-specific arguments.
+    """
     parser = HfArgumentParser((RunArguments, TrainingArguments))
     if len(sys.argv) > 1 and len(sys.argv[1]) == 2 and sys.argv[1].endswith(".json"):
         run_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
@@ -115,7 +129,37 @@ def parse_arguments():
     return run_args, training_args
 
 
-def setup_logging_and_seed(training_args):
+def setup_logging_and_seed(training_args: object) -> None:
+    """
+    Sets up logging configuration and random seed for reproducibility.
+
+    This function checks if the output directory exists and is not empty when training is enabled,
+    raising an error if overwriting is not allowed. It then sets the random seed for reproducibility
+    and configures the logging format and level. Finally, it logs training parameters and environment
+    information.
+
+    Parameters
+    ----------
+    training_args : object
+        An object containing training configuration parameters. Must have the following attributes:
+        - output_dir (str): Path to the output directory.
+        - do_train (bool): Whether training is enabled.
+        - overwrite_output_dir (bool): Whether to overwrite the output directory if it exists.
+        - seed (int): Random seed for reproducibility.
+        - local_rank (int): Local process rank for distributed training.
+        - device (str): Device identifier (e.g., 'cpu', 'cuda').
+        - n_gpu (int): Number of GPUs available.
+        - fp16 (bool): Whether to use 16-bit (mixed) precision training.
+
+    Raises
+    ------
+    ValueError
+        If the output directory exists, is not empty, training is enabled, and overwriting is not allowed.
+
+    Returns
+    -------
+    None
+    """
     if (
         os.path.exists(training_args.output_dir)
         and os.listdir(training_args.output_dir)
@@ -139,7 +183,19 @@ def setup_logging_and_seed(training_args):
     )
 
 
-def initialize_tokenizer():
+def initialize_tokenizer() -> "BertTokenizerFast":
+    """
+    Initializes a BERT tokenizer with additional special tokens.
+
+    The function creates a list of 16 unused tokens (from [unused1] to [unused16])
+    and loads the 'bert-base-cased' tokenizer from HuggingFace Transformers with these
+    tokens added as additional special tokens. Basic tokenization is disabled.
+
+    Returns
+    -------
+    BertTokenizerFast
+        An instance of BertTokenizerFast with the specified additional special tokens.
+    """
     added_token = [f"[unused{i}]" for i in range(1, 17)]
     tokenizer = BertTokenizerFast.from_pretrained(
         "bert-base-cased", additional_special_tokens=added_token, do_basic_tokenize=False
@@ -148,6 +204,31 @@ def initialize_tokenizer():
 
 
 def initialize_classes(run_args, training_args):
+    """
+    Initialize and return various classes and types based on the test data type specified in `run_args`.
+
+    Parameters
+    ----------
+    run_args : Any
+        An object containing runtime arguments, including `test_data_type`
+        which determines the types to be initialized.
+    training_args : Any
+        An object containing training arguments. The `label_names` attribute will be set based on the test data type.
+
+    Returns
+    -------
+    tuple
+        A tuple containing the following elements, each corresponding to the type or class selected for
+        the given test data type:
+        - DataProcessorType
+        - metric_type
+        - predict_metric_type
+        - DatasetType
+        - ExtractType
+        - ModelType
+        - PredictModelType
+    """
+
     DataProcessorType = DataProcessorDict[run_args.test_data_type]
     metric_type = DataMetricDict[run_args.test_data_type]
     predict_metric_type = PredictDataMetricDict[run_args.test_data_type]
@@ -159,7 +240,32 @@ def initialize_classes(run_args, training_args):
     return (DataProcessorType, metric_type, predict_metric_type, DatasetType, ExtractType, ModelType, PredictModelType)
 
 
-def load_datasets(run_args, tokenizer, DataProcessorType, DatasetType):
+def load_datasets(run_args, DataProcessorType, DatasetType):
+    """
+    Loads and processes datasets for training, development, and testing.
+
+    Parameters
+    ----------
+    run_args : argparse.Namespace
+        Arguments containing dataset configuration such as directory, name, sequence length, and data numbers.
+    tokenizer : PreTrainedTokenizer
+        Tokenizer instance used for processing text data.
+    DataProcessorType : type
+        Class type for the data processor, responsible for loading and preprocessing raw data.
+    DatasetType : type
+        Class type for the dataset, responsible for converting samples into model-ready datasets.
+
+    Returns
+    -------
+    data_processor : DataProcessorType
+        The instantiated data processor used for loading and preprocessing data.
+    train_dataset : DatasetType
+        Dataset object containing training samples.
+    dev_dataset : DatasetType
+        Dataset object containing development/validation samples.
+    test_dataset : DatasetType
+        Dataset object containing test samples.
+    """
     data_processor = DataProcessorType(
         root=run_args.dataset_dir, tokenizer=tokenizer, dataset_name=run_args.dataset_name
     )
@@ -213,6 +319,27 @@ def load_datasets(run_args, tokenizer, DataProcessorType, DatasetType):
 
 
 def initialize_model(run_args, data_processor, ModelType, tokenizer):
+    """
+    Initialize and configure a model for training or evaluation.
+
+    Parameters
+    ----------
+    run_args : argparse.Namespace
+        Arguments containing model directory, task name, threshold, and other configuration options.
+    data_processor : object
+        Data processor instance providing dataset-specific information such as number of labels and relations.
+    ModelType : type
+        The model class to instantiate (e.g., a subclass of `PreTrainedModel`).
+    tokenizer : PreTrainedTokenizer
+        Tokenizer used for processing input text.
+
+    Returns
+    -------
+    model : PreTrainedModel
+        The initialized model with updated configuration and resized token embeddings.
+    config : BertConfig
+        The configuration object used to initialize the model.
+    """
     config = BertConfig.from_pretrained(run_args.model_dir, finetuning_task=run_args.task_name)
     config.threshold = run_args.threshold
     config.num_labels = data_processor.num_labels
