@@ -1,29 +1,26 @@
 import collections
+import glob
 import logging
 import os
 import sys
-import csv
-import glob
 from dataclasses import dataclass, field
 from typing import Optional
 
 import transformers
-import numpy as np
-import torch
-# from torch.utils.tensorboard import SummaryWriter
-
-from transformers import (BertTokenizerFast, BertModel, Trainer,
-                          TrainingArguments, BertConfig, BertLMHeadModel)
-
+from transformers import (
+    BertConfig,
+    BertTokenizerFast,
+    Trainer,
+    TrainingArguments,
+    set_seed,
+)
 from transformers.hf_argparser import HfArgumentParser
-from transformers import EvalPrediction, set_seed
 
+from dataprocess.data_extractor import unirel_extractor, unirel_span_extractor
+from dataprocess.data_metric import unirel_metric, unirel_span_metric
 from dataprocess.data_processor import UniRelDataProcessor
 from dataprocess.dataset import UniRelDataset, UniRelSpanDataset
-
-from model.model_transformers import  UniRelModel
-from dataprocess.data_extractor import *
-from dataprocess.data_metric import *
+from model.model_transformers import UniRelModel
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -34,7 +31,7 @@ DataProcessorDict = {
 
 DatasetDict = {
     "nyt_all_sa": UniRelDataset,
-    "unirel_span": UniRelSpanDataset 
+    "unirel_span": UniRelSpanDataset
 }
 
 ModelDict = {
@@ -65,8 +62,8 @@ DataExtractDict = {
 }
 
 LableNamesDict = {
-    "nyt_all_sa": [ "tail_label"],
-    "unirel_span":["head_label", "tail_label", "span_label"],
+    "nyt_all_sa": ["tail_label"],
+    "unirel_span": ["head_label", "tail_label", "span_label"],
 }
 
 InputFeature = collections.namedtuple(
@@ -74,21 +71,21 @@ InputFeature = collections.namedtuple(
 
 logger = transformers.utils.logging.get_logger(__name__)
 
+
 class MyCallback(transformers.TrainerCallback):
     "A callback that prints a message at the beginning of training"
 
     def on_epoch_begin(self, args, state, control, **kwargs):
         print("Epoch start")
 
-
     def on_epoch_end(self, args, state, control, **kwargs):
         print("Epoch end")
 
 
-
 @dataclass
 class RunArguments:
-    """Arguments pretraining to which model/config/tokenizer we are going to continue training, or train from scratch.
+    """
+    Arguments pretraining to which model/config/tokenizer we are going to continue training, or train from scratch.
     """
     model_dir: Optional[str] = field(
         default=None,
@@ -216,8 +213,10 @@ if __name__ == '__main__':
     train_samples = data_processor.get_train_sample(
         token_len=run_args.max_seq_length, data_nums=run_args.train_data_nums)
     dev_samples = data_processor.get_dev_sample(
-        token_len=150, data_nums=run_args.test_data_nums)
-    
+        token_len=150,
+        data_nums=run_args.test_data_nums
+    )
+
     # For special experiment wants to test on specific testset
     if run_args.test_data_path is not None:
         test_samples = data_processor.get_specific_test_sample(
@@ -274,11 +273,9 @@ if __name__ == '__main__':
     config.is_separate_ablation = run_args.is_separate_ablation
     config.test_data_type = run_args.test_data_type
 
-
     model = ModelType(config=config, model_dir=run_args.model_dir)
     model.resize_token_embeddings(len(tokenizer))
 
-   
     if training_args.do_train:
         trainer = Trainer(
             model=model,
@@ -309,7 +306,7 @@ if __name__ == '__main__':
                         f"{training_args.output_dir}/checkpoint-*/{transformers.file_utils.WEIGHTS_NAME}",
                         recursive=True)))
         else:
-            checkpoints = [run_args.checkpoint_dir] 
+            checkpoints = [run_args.checkpoint_dir]
         logger.info(f"Test the following checkpoints: {checkpoints}")
         best_f1 = 0
         best_checkpoint = None
@@ -334,7 +331,7 @@ if __name__ == '__main__':
             # result = {f"{k}_{global_step}": v for k, v in eval_res.items()}
             # results.update(result)
             dev_predictions = trainer.predict(dev_dataset)
-            p,r,f1 =  ExtractType(tokenizer, dev_dataset, dev_predictions, output_dir)
+            p, r, f1 = ExtractType(tokenizer, dev_dataset, dev_predictions, output_dir)
             if f1 > best_f1:
                 best_f1 = f1
                 best_checkpoint = checkpoint
@@ -342,13 +339,15 @@ if __name__ == '__main__':
         # Do test
         logger.info(f"Best checkpoint at {best_checkpoint} with f1 = {best_f1}")
         model = PredictModelType.from_pretrained(best_checkpoint, config=config)
-        trainer = Trainer(model=model,
-                            args=training_args,
-                            eval_dataset=dev_dataset,
-                            callbacks=[MyCallback])
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            eval_dataset=dev_dataset,
+            callbacks=[MyCallback]
+        )
 
         test_prediction = trainer.predict(test_dataset)
         output_dir = os.path.join(training_args.output_dir, best_checkpoint.split("/")[-1])
         ExtractType(tokenizer, test_dataset, test_prediction, output_dir)
-            
+
     print("Here I am")

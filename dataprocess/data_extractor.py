@@ -1,11 +1,8 @@
 import json
-import numpy as np
-import torch
-import transformers
-from transformers import (BertTokenizerFast)
-import logging
 import os
-import sys
+
+import numpy as np
+import transformers
 
 logger = transformers.utils.logging.get_logger(__name__)
 
@@ -230,11 +227,7 @@ def unirel_extractor(tokenizer,
     return all_metirc_results["all-prec"], all_metirc_results["all-recall"], all_metirc_results["all-f1"]
 
 
-def unirel_span_extractor(tokenizer,
-                   dataset,
-                   predictions,
-                   path,
-                   ):
+def unirel_span_extractor(tokenizer, dataset, predictions, path):
     """
     Extractor triples from the modeled Attention matrix
     """
@@ -242,11 +235,11 @@ def unirel_span_extractor(tokenizer,
     token_len = dataset.max_length - 2
 
     state_dict = {"p": 0, "c": 0, "g": 0}
-    e2e_state_dict = {"p": 0, "c": 0, "g": 0}
-    e2e_tail_state_dict = {"p": 0, "c": 0, "g": 0}
-    e2e_plain_state_dict = {"p": 0, "c": 0, "g": 0}
-    h2r_state_dict = {"p": 0, "c": 0, "g": 0}
-    t2r_state_dict = {"p": 0, "c": 0, "g": 0}
+    # e2e_state_dict = {"p": 0, "c": 0, "g": 0}
+    # e2e_tail_state_dict = {"p": 0, "c": 0, "g": 0}
+    # e2e_plain_state_dict = {"p": 0, "c": 0, "g": 0}
+    # h2r_state_dict = {"p": 0, "c": 0, "g": 0}
+    # t2r_state_dict = {"p": 0, "c": 0, "g": 0}
     idx2pred = dataset.data_processor.idx2pred
     extract_data = []
     path = os.path.join(path, dataset.mode + '_predict_sard.json')
