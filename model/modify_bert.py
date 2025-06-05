@@ -1,3 +1,4 @@
+# flake8: noqa: E501
 # coding=utf-8
 # Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
 # Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
@@ -14,13 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # Code has been modified for outputing un-normalized attention score in each Transformer layer.
-"""PyTorch BERT model. """
-
-# This model is 
-
+"""PyTorch BERT model."""
 import math
 import os
-import warnings
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -28,24 +25,13 @@ import torch
 import torch.utils.checkpoint
 from packaging import version
 from torch import nn
-from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-
+from transformers import BertConfig
 from transformers.activations import ACT2FN
 from transformers.file_utils import (
     ModelOutput,
     add_code_sample_docstrings,
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
-    replace_return_docstrings,
-)
-from transformers.modeling_outputs import (
-    CausalLMOutputWithCrossAttentions,
-    MaskedLMOutput,
-    MultipleChoiceModelOutput,
-    NextSentencePredictorOutput,
-    QuestionAnsweringModelOutput,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
 )
 from transformers.modeling_utils import (
     PreTrainedModel,
@@ -54,8 +40,6 @@ from transformers.modeling_utils import (
     prune_linear_layer,
 )
 from transformers.utils import logging
-from transformers import BertConfig
-
 
 logger = logging.get_logger(__name__)
 
@@ -88,6 +72,7 @@ BERT_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "wietsedv/bert-base-dutch-cased",
     # See all BERT models at https://huggingface.co/models?filter=bert
 ]
+
 
 @dataclass
 class BaseModelOutputWithPastAndCrossAttentions(ModelOutput):
@@ -134,6 +119,7 @@ class BaseModelOutputWithPastAndCrossAttentions(ModelOutput):
     attentions: Optional[Tuple[torch.FloatTensor]] = None
     attentions_scores: Optional[Tuple[torch.FloatTensor]] = None
     cross_attentions: Optional[Tuple[torch.FloatTensor]] = None
+
 
 @dataclass
 class BaseModelOutputWithPoolingAndCrossAttentions(ModelOutput):
@@ -183,6 +169,7 @@ class BaseModelOutputWithPoolingAndCrossAttentions(ModelOutput):
     attentions: Optional[Tuple[torch.FloatTensor]] = None
     attentions_scores: Optional[Tuple[torch.FloatTensor]] = None
     cross_attentions: Optional[Tuple[torch.FloatTensor]] = None
+
 
 def load_tf_weights_in_bert(model, config, tf_checkpoint_path):
     """Load tf checkpoints in a pytorch model."""
@@ -341,7 +328,7 @@ class BertSelfAttention(nn.Module):
             self.distance_embedding = nn.Embedding(2 * config.max_position_embeddings - 1, self.attention_head_size)
 
         self.is_decoder = config.is_decoder
-        self.is_prompt_rel = False 
+        self.is_prompt_rel = False
         self.num_rels = config.num_rels
         if self.is_prompt_rel:
             self.rel_embedding = nn.Embedding(config.num_rels, config.hidden_size)
@@ -366,15 +353,15 @@ class BertSelfAttention(nn.Module):
         batch_size, token_len, emb_size = hidden_states.size()
         if self.is_prompt_rel:
             re_embedding = self.rel_embedding(torch.tensor(range(0, self.num_rels)).to(hidden_states.device))
-            ex_re_embedding = re_embedding.unsqueeze(0).repeat(batch_size,1,1)
+            ex_re_embedding = re_embedding.unsqueeze(0).repeat(batch_size, 1, 1)
             key_layer = self.transpose_for_scores(self.key(torch.cat((hidden_states, ex_re_embedding), -2)))
-            value_layer = self.transpose_for_scores(self.value(torch.cat((hidden_states, ex_re_embedding),-2)))
+            value_layer = self.transpose_for_scores(self.value(torch.cat((hidden_states, ex_re_embedding), -2)))
             # query_layer = self.transpose_for_scores(mixed_query_layer)
         else:
 
-        # If this is instantiated as a cross-attention module, the keys
-        # and values come from an encoder; the attention mask needs to be
-        # such that the encoder's padding tokens are not attended to.
+            # If this is instantiated as a cross-attention module, the keys
+            # and values come from an encoder; the attention mask needs to be
+            # such that the encoder's padding tokens are not attended to.
             is_cross_attention = encoder_hidden_states is not None
 
             if is_cross_attention and past_key_value is not None:
@@ -399,7 +386,7 @@ class BertSelfAttention(nn.Module):
 
             if self.is_decoder:
                 # if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
-                # Further calls to cross_attention layer can then reuse all cross-attention
+                # Further calls to cross-attention layer can then reuse all cross-attention
                 # key/value_states (first "if" case)
                 # if uni-directional self-attention (decoder) save Tuple(torch.Tensor, torch.Tensor) of
                 # all previous decoder key/value_states. Further calls to uni-directional self-attention
@@ -430,7 +417,14 @@ class BertSelfAttention(nn.Module):
         if attention_mask is not None:
             # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
             if self.is_prompt_rel:
-                rel_attention_mask = torch.zeros(self.num_rels).to(hidden_states.device).unsqueeze(0).unsqueeze(0).unsqueeze(0).repeat(batch_size, 1, 1, 1)
+                rel_attention_mask = (
+                    torch.zeros(self.num_rels)
+                    .to(hidden_states.device)
+                    .unsqueeze(0)
+                    .unsqueeze(0)
+                    .unsqueeze(0)
+                    .repeat(batch_size, 1, 1, 1)
+                )
                 attention_scores = attention_scores + torch.cat((attention_mask, rel_attention_mask), -1)
             else:
                 attention_scores = attention_scores + attention_mask
@@ -514,7 +508,7 @@ class BertAttention(nn.Module):
         encoder_attention_mask=None,
         past_key_value=None,
         output_attentions=False,
-        output_attentions_scores=False
+        output_attentions_scores=False,
     ):
         self_outputs = self.self(
             hidden_states,
@@ -524,7 +518,7 @@ class BertAttention(nn.Module):
             encoder_attention_mask,
             past_key_value,
             output_attentions,
-            output_attentions_scores
+            output_attentions_scores,
         )
         attention_output = self.output(self_outputs[0], hidden_states)
         outputs = (attention_output,) + self_outputs[1:]  # add attentions if we output them
@@ -584,7 +578,7 @@ class BertLayer(nn.Module):
         encoder_attention_mask=None,
         past_key_value=None,
         output_attentions=False,
-        output_attentions_scores=False
+        output_attentions_scores=False,
     ):
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
         self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
@@ -909,7 +903,6 @@ class BertForPreTrainingOutput(ModelOutput):
     attentions: Optional[Tuple[torch.FloatTensor]] = None
 
 
-
 BERT_START_DOCSTRING = r"""
 
     This model inherits from :class:`~transformers.PreTrainedModel`. Check the superclass documentation for the generic
@@ -1066,7 +1059,9 @@ class BertModel(BertPreTrainedModel):
             decoding (see :obj:`past_key_values`).
         """
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_attentions_scores = output_attentions_scores if output_attentions_scores is not None else self.config.output_attentions
+        output_attentions_scores = (
+            output_attentions_scores if output_attentions_scores is not None else self.config.output_attentions
+        )
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
