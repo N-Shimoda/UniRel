@@ -31,7 +31,9 @@ class UniRelModel(BertPreTrainedModel):
             self.bert = BertModel(config)
 
         # Easy debug
-        self.tokenizer = BertTokenizerFast.from_pretrained("bert-base-cased", do_basic_tokenize=False)
+        self.tokenizer = BertTokenizerFast.from_pretrained(
+            "bert-base-cased", do_basic_tokenize=False, clean_up_tokenization_spaces=False
+        )
 
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
