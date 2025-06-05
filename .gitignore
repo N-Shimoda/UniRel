@@ -1,5 +1,10 @@
+__pycache__/
+
+# data and outputs
 data4bert/
 __MACOSX/
-__pycache__/
+output/
+
+# logs
 tb_logs/
 wandb/
