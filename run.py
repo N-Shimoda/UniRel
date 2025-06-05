@@ -240,7 +240,7 @@ def initialize_classes(run_args, training_args):
     return (DataProcessorType, metric_type, predict_metric_type, DatasetType, ExtractType, ModelType, PredictModelType)
 
 
-def load_datasets(run_args, DataProcessorType, DatasetType):
+def load_datasets(run_args, tokenizer, DataProcessorType, DatasetType):
     """
     Loads and processes datasets for training, development, and testing.
 
@@ -431,13 +431,17 @@ def test_all_checkpoints(
             os.path.dirname(c)
             for c in sorted(
                 glob.glob(
-                    f"{training_args.output_dir}/checkpoint-*/{transformers.file_utils.WEIGHTS_NAME}", recursive=True
+                    # f"{training_args.output_dir}/checkpoint-*/{transformers.file_utils.WEIGHTS_NAME}",
+                    f"{training_args.output_dir}/checkpoint-*/training_args.bin",
+                    recursive=True,
                 )
             )
         )
     else:
         checkpoints = [run_args.checkpoint_dir]
     logger.info(f"Test the following checkpoints: {checkpoints}")
+
+    # find the best checkpoint
     best_f1 = 0
     best_checkpoint = None
     for checkpoint in checkpoints:
@@ -446,15 +450,17 @@ def test_all_checkpoints(
         output_dir = os.path.join(training_args.output_dir, checkpoint.split("/")[-1])
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir)
-        model = PredictModelType.from_pretrained(checkpoint, config=config)
+        model = PredictModelType.from_pretrained(checkpoint, config=config, attn_implementation="eager")
         trainer = Trainer(model=model, args=training_args, eval_dataset=dev_dataset, callbacks=[MyCallback])
         dev_predictions = trainer.predict(dev_dataset)
         p, r, f1 = ExtractType(tokenizer, dev_dataset, dev_predictions, output_dir)
         if f1 > best_f1:
             best_f1 = f1
             best_checkpoint = checkpoint
+
+    # Log the best checkpoint and its F1 score
     logger.info(f"Best checkpoint at {best_checkpoint} with f1 = {best_f1}")
-    model = PredictModelType.from_pretrained(best_checkpoint, config=config)
+    model = PredictModelType.from_pretrained(best_checkpoint, config=config, attn_implementation="eager")
     trainer = Trainer(model=model, args=training_args, eval_dataset=dev_dataset, callbacks=[MyCallback])
     test_prediction = trainer.predict(test_dataset)
     output_dir = os.path.join(training_args.output_dir, best_checkpoint.split("/")[-1])
