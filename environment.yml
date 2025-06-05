@@ -1,0 +1,13 @@
+name: unirel
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python==3.11
+  - pytorch
+  - transformers
+  - conda-forge::scikit-learn
+  - tensorflow
+  - conda-forge::tf-keras
+  - accelerate
+  - wandb
