@@ -3,6 +3,7 @@ import glob
 import logging
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -45,7 +46,7 @@ InputFeature = collections.namedtuple("InputFeature", ["input_ids", "attention_m
 
 
 class MyCallback(transformers.TrainerCallback):
-    "A callback that prints a message at the beginning of training"
+    """A callback that prints a message at the beginning of training"""
 
     def on_epoch_begin(self, args, state, control, **kwargs):
         print("Epoch start")
@@ -106,7 +107,7 @@ class RunArguments:
     )
 
 
-def parse_arguments() -> tuple:
+def parse_arguments() -> tuple["RunArguments", TrainingArguments]:
     """
     Parse command-line arguments or a JSON configuration file for running and training.
 
@@ -155,10 +156,6 @@ def setup_logging_and_seed(training_args: object) -> None:
     ------
     ValueError
         If the output directory exists, is not empty, training is enabled, and overwriting is not allowed.
-
-    Returns
-    -------
-    None
     """
     if (
         os.path.exists(training_args.output_dir)
@@ -177,7 +174,7 @@ def setup_logging_and_seed(training_args: object) -> None:
         level=logging.INFO,
     )
     logger.info("Training parameter %s", training_args)
-    logger.warning(
+    logger.info(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
     )
@@ -198,7 +195,10 @@ def initialize_tokenizer() -> "BertTokenizerFast":
     """
     added_token = [f"[unused{i}]" for i in range(1, 17)]
     tokenizer = BertTokenizerFast.from_pretrained(
-        "bert-base-cased", additional_special_tokens=added_token, do_basic_tokenize=False
+        "bert-base-cased",
+        additional_special_tokens=added_token,
+        do_basic_tokenize=False,
+        clean_up_tokenization_spaces=False,
     )
     return tokenizer
 
@@ -469,7 +469,10 @@ def test_all_checkpoints(
 
 if __name__ == "__main__":
 
+    # setup
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    os.environ["TZ"] = "Asia/Tokyo"
+    time.tzset()
     logger = transformers.utils.logging.get_logger(__name__)
 
     run_args, training_args = parse_arguments()
