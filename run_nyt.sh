@@ -1,4 +1,3 @@
-export CUDA_VISIBLE_DEVICES=6
 python3 run.py \
     --task_name UniRel \
     --max_seq_length 100 \
@@ -12,16 +11,16 @@ python3 run.py \
     --save_steps 5000 \
     --evaluation_strategy steps \
     --warmup_ratio 0.1 \
-    --model_dir ./bert-base-cased/ \
+    --model_dir bert-base-cased \
     --output_dir ./output/nyt \
     --overwrite_output_dir \
-    --dataset_dir YourDataDir \
+    --dataset_dir data4bert \
     --dataloader_pin_memory \
     --dataloader_num_workers 4 \
     --lr_scheduler_type cosine \
     --seed 2023 \
-    --do_test_all_checkpoints\
     --dataset_name nyt \
     --test_data_type unirel_span \
     --threshold 0.5 \
-    --do_train
+    --do_train \
+    --do_test_all_checkpoints

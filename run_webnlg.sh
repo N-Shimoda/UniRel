@@ -1,4 +1,3 @@
-export CUDA_VISIBLE_DEVICES=0,1
 python3 run.py \
     --task_name UniRel \
     --max_seq_length 100 \
@@ -20,8 +19,9 @@ python3 run.py \
     --dataloader_num_workers 4 \
     --lr_scheduler_type cosine \
     --seed 2023 \
-    --do_test_all_checkpoints\
     --dataset_name webnlg \
     --test_data_type unirel_span \
     --threshold 0.5 \
-    --do_train
+    --do_train \
+    --do_test_all_checkpoints
+    
